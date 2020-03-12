@@ -31,16 +31,46 @@
 #include "battery_measure_task.h"
 
 #include "BCDS_Basics.h"
+#include "XDK_Storage.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
+
+#include <stdio.h>
 
 #define TASK_DELAY_INTERVAL UINT32_C(600000)
 
 void battery_measure_task(void * task_parameters) {
 	BCDS_UNUSED(task_parameters);
 
+	TickType_t last_wake_tick = xTaskGetTickCount();
+	Retcode_T retcode = RETCODE_OK;
+	Storage_Setup_T storage_setup = { .SDCard = true, .WiFiFileSystem = false };
+
 	while (1) {
-		vTaskDelay(pdMS_TO_TICKS(TASK_DELAY_INTERVAL));
+		vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(TASK_DELAY_INTERVAL));
+
+		retcode = Storage_Setup(&storage_setup);
+		if (retcode != RETCODE_OK) {
+			printf("Failed to setup storage \r\n");
+			goto close_storage_label;
+		}
+
+		retcode = Storage_Enable();
+		if (retcode != RETCODE_OK) {
+			printf("Failed to enable storage \r\n");
+			goto disable_storage_label;
+		}
+
+		disable_storage_label: retcode = Storage_Disable(
+				STORAGE_MEDIUM_SD_CARD);
+		if (retcode != RETCODE_OK) {
+			printf("Failed to disable SD card storage \r\n");
+		}
+
+		close_storage_label: retcode = Storage_Close();
+		if (retcode != RETCODE_OK) {
+			printf("Failed to close storage \r\n");
+		}
 	}
 }
