@@ -43,6 +43,7 @@
 #include "battery_measure_task.h"
 
 #include "BCDS_CmdProcessor.h"
+#include "BatteryMonitor.h"
 #include "XDK_Utils.h"
 
 #include "FreeRTOS.h"
@@ -55,6 +56,10 @@
 
 static CmdProcessor_T * app_cmd_processor = NULL;
 static TaskHandle_t battery_measure_task_handle = NULL;
+
+static void create_tasks(void * param1, uint32_t param2);
+static void enable_subsystems(void * param1, uint32_t param2);
+static void setup_subsystems(void * param1, uint32_t param2);
 
 static void create_tasks(void * param1, uint32_t param2) {
 	BCDS_UNUSED(param1);
@@ -104,8 +109,15 @@ static void setup_subsystems(void * param1, uint32_t param2) {
 
 	printf("setup_subsystems \r\n");
 
-	retcode = CmdProcessor_Enqueue(app_cmd_processor, enable_subsystems, NULL,
-			UINT32_C(0));
+	retcode = BatteryMonitor_Init();
+	if (RETCODE_OK != retcode) {
+		printf("Failed to initialize battery monitor \r\n");
+	}
+
+	if (retcode == RETCODE_OK) {
+		retcode = CmdProcessor_Enqueue(app_cmd_processor, enable_subsystems,
+		NULL, UINT32_C(0));
+	}
 
 	if (RETCODE_OK != retcode) {
 		printf("setup_subsystems failed \r\n");

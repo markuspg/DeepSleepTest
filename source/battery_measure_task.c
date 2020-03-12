@@ -48,11 +48,6 @@ void battery_measure_task(void * task_parameters) {
 	Retcode_T retcode = RETCODE_OK;
 	Storage_Setup_T storage_setup = { .SDCard = true, .WiFiFileSystem = false };
 
-	if (RETCODE_OK != BatteryMonitor_Init()) {
-		printf("Failed to initialize battery monitor \r\n");
-		assert(0);
-	}
-
 	while (1) {
 		vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(TASK_DELAY_INTERVAL));
 
