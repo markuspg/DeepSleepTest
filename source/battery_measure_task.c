@@ -79,12 +79,22 @@ void battery_measure_task(void * task_parameters) {
 			goto disable_storage_label;
 		}
 
+		/* Write the recorded data to a buffer for writing */
 		retcode = print_ticks_and_voltage_to_buf(write_buf, sizeof(write_buf),
 				xTaskGetTickCount(), battery_voltage_mV,
 				&write_creds.BytesToWrite);
 		if (RETCODE_OK != retcode) {
 			printf("Failed to write data to buffer for writing \r\n");
 			goto disable_storage_label;
+		}
+
+		/* Write the buffer to the SD card */
+		retcode = Storage_Write(STORAGE_MEDIUM_SD_CARD, &write_creds);
+		if (RETCODE_OK != retcode) {
+			printf("Failed to write buffer to SD card \r\n");
+			goto disable_storage_label;
+		} else {
+			write_creds.Offset += write_creds.ActualBytesWritten;
 		}
 
 		/* Deinitialize storage */
