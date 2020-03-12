@@ -36,9 +36,13 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 
 #define TASK_DELAY_INTERVAL UINT32_C(600000)
+
+static Retcode_T print_ticks_and_voltage_to_buf(uint8_t * buf, size_t buf_size,
+		TickType_t ticks, uint32_t battery_voltage, uint32_t * bytes_to_write);
 
 void battery_measure_task(void * task_parameters) {
 	BCDS_UNUSED(task_parameters);
@@ -47,6 +51,10 @@ void battery_measure_task(void * task_parameters) {
 	TickType_t last_wake_tick = xTaskGetTickCount();
 	Retcode_T retcode = RETCODE_OK;
 	Storage_Setup_T storage_setup = { .SDCard = true, .WiFiFileSystem = false };
+	uint8_t write_buf[64];
+	Storage_Write_T write_creds = { .ActualBytesWritten = 0, .BytesToWrite = 0,
+			.FileName = "battery_voltage.csv", .Offset = 0, .WriteBuffer =
+					write_buf };
 
 	while (1) {
 		vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(TASK_DELAY_INTERVAL));
@@ -71,6 +79,14 @@ void battery_measure_task(void * task_parameters) {
 			goto disable_storage_label;
 		}
 
+		retcode = print_ticks_and_voltage_to_buf(write_buf, sizeof(write_buf),
+				xTaskGetTickCount(), battery_voltage_mV,
+				&write_creds.BytesToWrite);
+		if (RETCODE_OK != retcode) {
+			printf("Failed to write data to buffer for writing \r\n");
+			goto disable_storage_label;
+		}
+
 		/* Deinitialize storage */
 		disable_storage_label: retcode = Storage_Disable(
 				STORAGE_MEDIUM_SD_CARD);
@@ -83,4 +99,19 @@ void battery_measure_task(void * task_parameters) {
 			printf("Failed to close storage \r\n");
 		}
 	}
+}
+
+static Retcode_T print_ticks_and_voltage_to_buf(uint8_t * buf, size_t buf_size,
+		TickType_t ticks, uint32_t battery_voltage, uint32_t * bytes_to_write) {
+	memset(buf, 0, buf_size);
+
+	*bytes_to_write = sprintf((char *) buf, "%"PRIu32",%"PRIu32"\n", ticks,
+			battery_voltage);
+	if ((*bytes_to_write < 1) || (*bytes_to_write > (buf_size - 1))) {
+		printf("Failed to write data to buffer \r\n");
+		*bytes_to_write = 0;
+		return RETCODE_FAILURE;
+	}
+
+	return RETCODE_OK;
 }
